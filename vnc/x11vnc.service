@@ -1,0 +1,14 @@
+[Unit]
+Description=x11vnc server
+After=network.target
+
+[Service]
+Type=forking
+#PIDFile=/root/.vnc/x11vnc.pid
+ExecStart=/usr/bin/x11vnc -auth /var/run/lightdm/root/:0 -forever -bg -rfbauth /etc/vnc.pass -rfbport 5900
+#ExecReload=/bin/kill -s HUP $MAINPID
+#ExecStop=/bin/kill -s TERM $MAINPID
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

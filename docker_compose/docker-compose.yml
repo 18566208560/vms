@@ -1,0 +1,117 @@
+version: '3'
+services:
+    guacd:
+        container_name: guacamole_guacd
+        image: guacamole/guacd:1.0.0
+        ports:
+            - "4822:4822"
+        networks:
+            guacamole_network:
+                ipv4_address: 172.99.0.2
+        privileged: true
+        restart: always
+    guacamole:
+        container_name: guacamole_guacamole
+        build: ./guacamole
+        ports:
+            - "8080:8080"
+        networks:
+            guacamole_network:
+                ipv4_address: 172.99.0.3
+        depends_on:
+            - guacd
+            - mysql
+        links:
+            - guacd:guacd
+            - mysql:mysql
+        environment:
+            - GUACD_HOSTNAME=172.99.0.2
+            - GUACD_PORT=4822
+            - MYSQL_HOSTNAME=172.99.0.4
+            - MYSQL_PORT=3306
+            - MYSQL_DATABASE=guacamole_db
+            - MYSQL_USER=guacamole
+            - MYSQL_PASSWORD=guacamole
+        privileged: true
+        restart: always
+    mysql:
+        container_name: guacamole_mysql
+        image: mysql:5.7
+        ports:
+            - "3306:3306"
+        volumes:
+            - db:/var/lib/mysql
+            - ./mysql/:/root/
+        environment:
+            - MYSQL_ROOT_PASSWORD=0.0010.0
+            - MYSQL_DATABASE=guacamole_db
+            - MYSQL_USER=guacamole
+            - MYSQL_PASSWORD=guacamole
+        # command: ["mysql","-uguacamole","-pguacamole","guacamole_db","<","/root/initdb.sql"]
+        networks:
+            guacamole_network:
+                ipv4_address: 172.99.0.4
+        privileged: true
+        restart: always
+    nginx:
+        container_name: main_nginx
+        image: nginx:1.17
+        ports:
+            - "80:80"
+        volumes:
+            - ./nginx/conf/:/etc/nginx/conf.d/
+            - ./nginx/html/:/usr/share/nginx/html/
+            - ./nginx/static/:/usr/share/nginx/static/
+        depends_on:
+            - guacamole
+            - backend
+        networks:
+            guacamole_network:
+                ipv4_address: 172.99.0.5
+        privileged: true
+        restart: always
+    backend:
+        container_name: backend_py3
+        build: ./python
+        ports:
+            - "8000:8000"
+        networks:
+            guacamole_network:
+                ipv4_address: 172.99.0.6
+        environment:
+            - MYSQL_HOST=172.99.0.4
+            - MYSQL_PORT=3306
+            - MSYQL_USER=root
+            - MYSQL_PWD=0.0010.0
+            - MYSQL_NAME=yeslab_db
+            - REDIS_URI=redis://172.99.0.7:6379
+        volumes:
+            - ../backend/:/usr/src/app
+        depends_on:
+            - "mysql"
+            - "redis"
+        # https://www.lizenghai.com/archives/4167.html
+        command: ["uwsgi","--socket","172.99.0.6:8000","--wsgi-file","bookingSysterm/wsgi.py","--master","--processes","2","--threads","2"]
+        privileged: true
+        restart: always
+    redis:
+        container_name: redis
+        image: redis:5
+        ports:
+            - "6379:6379"
+        networks:
+            guacamole_network:
+                ipv4_address: 172.99.0.7
+        privileged: true
+        restart: always
+networks:
+    guacamole_network:
+        driver: bridge
+        ipam:
+           config:
+              - subnet: 172.99.0.0/16
+volumes:
+    db:
+        driver: local
+
+
